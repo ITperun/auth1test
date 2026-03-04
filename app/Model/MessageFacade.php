@@ -26,10 +26,11 @@ final class MessageFacade
      */
     public function addMessage(int $senderId, string $content): void
     {
-        $this->database->table('messages')->insert([
-            'sender_id' => $senderId,
-            'content' => $content,
-            // Дату (created_at) база данных подставит сама! ✨
-        ]);
+        // В MessageFacade.php внутри addMessage:
+$this->database->table('messages')->insert([
+    'sender_id' => $senderId,
+    'content' => $content,
+    'created_at' => new \DateTime, // Добавь эту строчку ✨
+]);
     }
 }
