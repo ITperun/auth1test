@@ -1,14 +1,16 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Tracy (https://tracy.nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Tracy\Dumper;
+
+use Dom;
 use Ds;
+use function array_diff_key, array_key_exists, count, end, explode, get_mangled_object_vars, implode, iterator_to_array, preg_match_all, sort;
+use const PHP_VERSION_ID;
 
 
 /**
@@ -19,6 +21,11 @@ final class Exposer
 {
 	public static function exposeObject(object $obj, Value $value, Describer $describer): void
 	{
+		if (PHP_VERSION_ID >= 80400 && (new \ReflectionClass($obj))->isUninitializedLazyObject($obj)) {
+			self::exposeLazyObject($obj, $describer, $value);
+			return;
+		}
+
 		$values = get_mangled_object_vars($obj);
 		$props = self::getProperties($obj::class);
 
@@ -61,6 +68,10 @@ final class Exposer
 	}
 
 
+	/**
+	 * @param  class-string  $class
+	 * @return array<string, array{string, class-string, int}>
+	 */
 	private static function getProperties(string $class): array
 	{
 		static $cache;
@@ -141,7 +152,7 @@ final class Exposer
 	}
 
 
-	public static function exposeDOMNode(\DOMNode $obj, Value $value, Describer $describer): void
+	public static function exposeDOMNode(\DOMNode|Dom\Node $obj, Value $value, Describer $describer): void
 	{
 		$props = preg_match_all('#^\s*\[([^\]]+)\] =>#m', print_r($obj, return: true), $tmp) ? $tmp[1] : [];
 		sort($props);
@@ -152,7 +163,7 @@ final class Exposer
 
 
 	public static function exposeDOMNodeList(
-		\DOMNodeList|\DOMNamedNodeMap $obj,
+		\DOMNodeList|\DOMNamedNodeMap|Dom\NodeList|Dom\NamedNodeMap|Dom\TokenList|Dom\HTMLCollection $obj,
 		Value $value,
 		Describer $describer,
 	): void
@@ -188,6 +199,7 @@ final class Exposer
 	}
 
 
+	/** @return array{path: string} */
 	public static function exposeSplFileInfo(\SplFileInfo $obj): array
 	{
 		return ['path' => $obj->getPathname()];
@@ -203,7 +215,8 @@ final class Exposer
 			$describer->addPropertyTo($pair, 'key', $v);
 			$describer->addPropertyTo($pair, 'value', $obj[$v]);
 			$describer->addPropertyTo($value, '', null, described: $pair);
-			$value->items[array_key_last($value->items)][0] = '';
+			assert($value->items !== null);
+			$value->items[count($value->items) - 1][0] = '';
 		}
 	}
 
@@ -217,7 +230,8 @@ final class Exposer
 			$describer->addPropertyTo($pair, 'key', $k);
 			$describer->addPropertyTo($pair, 'value', $v);
 			$describer->addPropertyTo($value, '', null, described: $pair);
-			$value->items[array_key_last($value->items)][0] = '';
+			assert($value->items !== null);
+			$value->items[count($value->items) - 1][0] = '';
 		}
 	}
 
@@ -273,5 +287,24 @@ final class Exposer
 		foreach ($obj as $k => $v) {
 			$describer->addPropertyTo($value, (string) $i++, new Ds\Pair($k, $v));
 		}
+	}
+
+
+	private static function exposeLazyObject(object $obj, Describer $describer, Value $value): void
+	{
+		$rc = new \ReflectionClass($obj);
+		foreach ($rc->getProperties(\ReflectionProperty::IS_PUBLIC) as $prop) {
+			if (!$prop->isLazy($obj)) {
+				$describer->addPropertyTo(
+					$value,
+					$prop->getName(),
+					$prop->getValue($obj),
+					Value::PropertyPublic,
+					described: $describer->describeEnumProperty($obj::class, $prop->getName(), $prop->getValue($obj)),
+				);
+			}
+		}
+
+		$value->value .= ' (lazy)';
 	}
 }
