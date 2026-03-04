@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Nette\Neon;
 
+use function array_keys, count, is_array, is_int, is_object, is_string, max, range;
+
 
 /**
  * Converts value to NEON format.
@@ -63,8 +65,14 @@ final class Encoder
 			$node->items = $this->arrayToNodes($val, $blockMode);
 			return $node;
 
-		} elseif (is_string($val) && Lexer::requiresDelimiters($val)) {
-			return new Node\StringNode($val);
+		} elseif (is_string($val)) {
+			if (preg_match('//u', $val) === false) {
+				trigger_error('Invalid UTF-8 sequence in string, replaced with U+FFFD', E_USER_WARNING);
+				$val = json_decode(json_encode($val, JSON_INVALID_UTF8_SUBSTITUTE));
+			}
+			return Lexer::requiresDelimiters($val)
+				? new Node\StringNode($val, $this->indentation)
+				: new Node\LiteralNode($val);
 
 		} else {
 			return new Node\LiteralNode($val);

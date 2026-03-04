@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Nette\Application\Responses;
 
 use Nette;
+use function strlen;
 
 
 /**
@@ -36,7 +37,7 @@ final class FileResponse implements Nette\Application\Response
 
 		$this->file = $file;
 		$this->name = $name ?? basename($file);
-		$this->contentType = $contentType ?: 'application/octet-stream';
+		$this->contentType = $contentType ?? 'application/octet-stream';
 		$this->forceDownload = $forceDownload;
 	}
 

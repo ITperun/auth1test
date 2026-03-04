@@ -1,15 +1,14 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Nette Framework (https://nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Nette\PhpGenerator;
 
 use Nette;
+use function func_num_args;
 
 
 /**
@@ -30,6 +29,7 @@ final class Method
 	private bool $abstract = false;
 
 
+	/** @param  string|array{object|string, string}|(\Closure(): mixed)  $method */
 	public static function from(string|array|\Closure $method): static
 	{
 		return (new Factory)->fromMethodReflection(Nette\Utils\Callback::toReflection($method));

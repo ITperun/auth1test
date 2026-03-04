@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Nette\Neon;
 
+use function in_array, str_replace, strlen, strrpos, substr, substr_count;
+
 
 /** @internal */
 final class TokenStream
@@ -90,6 +92,6 @@ final class TokenStream
 		$message ??= 'Unexpected ' . ($token === null
 			? 'end'
 			: "'" . str_replace("\n", '<new line>', substr($this->tokens[$pos]->value, 0, 40)) . "'");
-		throw new Exception("$message on line $line, column $col.");
+		throw new Exception("$message on line $line at column $col");
 	}
 }

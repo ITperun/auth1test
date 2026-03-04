@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Essential\Nodes;
 
@@ -19,11 +17,13 @@ use Latte\Compiler\Nodes\StatementNode;
 use Latte\Compiler\PrintContext;
 use Latte\Compiler\Tag;
 use Latte\Compiler\Token;
+use Latte\Helpers;
+use function assert, implode, is_string;
 
 
 /**
- * {var [type] $var = value, ...}
- * {default [type] $var = value, ...}
+ * {var [type] $name = value}
+ * {default $name = value}
  */
 class VarNode extends StatementNode
 {
@@ -43,6 +43,7 @@ class VarNode extends StatementNode
 	}
 
 
+	/** @return AssignNode[] */
 	private static function parseAssignments(Tag $tag, bool $default): array
 	{
 		$stream = $tag->parser->stream;
@@ -72,11 +73,13 @@ class VarNode extends StatementNode
 		foreach ($this->assignments as $assign) {
 			if ($this->default) {
 				assert($assign->var instanceof VariableNode);
+				assert(is_string($assign->var->name));
+				$varName = $assign->var->name;
 				$assign = new AssignOpNode(
 					$assign->var,
 					'??',
 					new TernaryNode(
-						new AuxiliaryNode(fn() => 'array_key_exists(' . $context->encodeString($assign->var->name) . ', get_defined_vars())'),
+						new AuxiliaryNode(fn() => 'array_key_exists(' . $context->encodeString($varName) . ', get_defined_vars())'),
 						new NullNode,
 						$assign->expr,
 					),
@@ -98,5 +101,6 @@ class VarNode extends StatementNode
 		foreach ($this->assignments as &$assign) {
 			yield $assign;
 		}
+		Helpers::removeNulls($this->assignments);
 	}
 }

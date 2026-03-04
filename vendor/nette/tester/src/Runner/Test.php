@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Tester\Runner;
 
+use function array_map, implode, is_array, is_int;
+
 
 /**
  * Test represents one result.
@@ -33,6 +35,8 @@ class Test
 	public string $stdout = '';
 	public string $stderr = '';
 	private string $file;
+
+	/** @var self::Prepared|self::Failed|self::Passed|self::Skipped */
 	private int $result = self::Prepared;
 	private ?float $duration = null;
 
@@ -70,6 +74,7 @@ class Test
 	}
 
 
+	/** @return self::Failed|self::Passed|self::Skipped */
 	public function getResult(): int
 	{
 		return $this->result;
@@ -112,10 +117,8 @@ class Test
 	}
 
 
-	/**
-	 * @return static
-	 */
-	public function withArguments(array $args): self
+	/** @param array<int|string, int|string|string[]>  $args */
+	public function withArguments(array $args): static
 	{
 		if ($this->hasResult()) {
 			throw new \LogicException('Cannot change arguments of test which already has a result.');
@@ -134,10 +137,8 @@ class Test
 	}
 
 
-	/**
-	 * @return static
-	 */
-	public function withResult(int $result, ?string $message, ?float $duration = null): self
+	/** @param self::Failed|self::Passed|self::Skipped  $result */
+	public function withResult(int $result, ?string $message, ?float $duration = null): static
 	{
 		if ($this->hasResult()) {
 			throw new \LogicException("Result of test is already set to $this->result with message '$this->message'.");

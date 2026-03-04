@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Nette Framework (https://nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Nette\PhpGenerator;
 
@@ -17,6 +15,7 @@ class Literal
 {
 	/**
 	 * Creates a literal representing the creation of an object using the new operator.
+	 * @param  mixed[]  $args
 	 */
 	public static function new(string $class, array $args = []): self
 	{
@@ -25,9 +24,9 @@ class Literal
 
 
 	public function __construct(
-		private string $value,
+		private readonly string $value,
 		/** @var ?mixed[] */
-		private ?array $args = null,
+		private readonly ?array $args = null,
 	) {
 	}
 

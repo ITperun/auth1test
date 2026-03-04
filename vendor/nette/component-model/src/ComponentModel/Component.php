@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Nette\ComponentModel;
 
 use Nette;
+use function func_num_args, in_array, substr;
 
 
 /**
@@ -36,6 +37,7 @@ abstract class Component implements IComponent
 	 */
 	final public function lookup(?string $type, bool $throw = true): ?IComponent
 	{
+		$type ??= '';
 		if (!isset($this->monitors[$type])) { // not monitored or not processed yet
 			$obj = $this->parent;
 			$path = self::NameSeparator . $this->name;
@@ -81,7 +83,7 @@ abstract class Component implements IComponent
 	final public function lookupPath(?string $type = null, bool $throw = true): ?string
 	{
 		$this->lookup($type, $throw);
-		return $this->monitors[$type][2];
+		return $this->monitors[$type ?? ''][2];
 	}
 
 
@@ -297,17 +299,8 @@ abstract class Component implements IComponent
 	/**
 	 * Prevents serialization.
 	 */
-	final public function __sleep()
+	final public function __serialize()
 	{
 		throw new Nette\NotImplementedException('Object serialization is not supported by class ' . static::class);
-	}
-
-
-	/**
-	 * Prevents unserialization.
-	 */
-	final public function __wakeup()
-	{
-		throw new Nette\NotImplementedException('Object unserialization is not supported by class ' . static::class);
 	}
 }

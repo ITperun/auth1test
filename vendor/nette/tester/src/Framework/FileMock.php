@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace Tester;
 
+use function in_array, strlen;
+use const SEEK_CUR, SEEK_END, STREAM_META_TOUCH;
+
 
 /**
  * Mock files.
@@ -47,7 +50,7 @@ class FileMock
 
 	public static function register(): void
 	{
-		if (!in_array(self::Protocol, stream_get_wrappers(), true)) {
+		if (!in_array(self::Protocol, stream_get_wrappers(), strict: true)) {
 			stream_wrapper_register(self::Protocol, self::class);
 		}
 	}
@@ -86,7 +89,7 @@ class FileMock
 	}
 
 
-	public function stream_read(int $length)
+	public function stream_read(int $length): false|string
 	{
 		if (!$this->isReadable) {
 			return false;
@@ -99,7 +102,7 @@ class FileMock
 	}
 
 
-	public function stream_write(string $data)
+	public function stream_write(string $data): false|int
 	{
 		if (!$this->isWritable) {
 			return false;
@@ -162,13 +165,15 @@ class FileMock
 	}
 
 
+	/** @return array<string, int> */
 	public function stream_stat(): array
 	{
 		return ['mode' => 0100666, 'size' => strlen($this->content)];
 	}
 
 
-	public function url_stat(string $path, int $flags)
+	/** @return array<string, int>|false */
+	public function url_stat(string $path, int $flags): array|false
 	{
 		return isset(self::$files[$path])
 			? ['mode' => 0100666, 'size' => strlen(self::$files[$path])]
@@ -182,14 +187,12 @@ class FileMock
 	}
 
 
-	public function stream_metadata(string $path, int $option, $value): bool
+	public function stream_metadata(string $path, int $option, mixed $value): bool
 	{
-		switch ($option) {
-			case STREAM_META_TOUCH:
-				return true;
-		}
-
-		return false;
+		return match ($option) {
+			STREAM_META_TOUCH => true,
+			default => false,
+		};
 	}
 
 

@@ -1,16 +1,15 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Nette Framework (https://nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Nette\PhpGenerator;
 
 use Nette;
 use Nette\Utils\Strings;
+use function array_filter, array_map, count, end, get_debug_type, implode, is_scalar, ltrim, preg_replace, rtrim, str_contains, str_repeat, str_replace, strlen, substr;
 
 
 /**
@@ -27,8 +26,9 @@ class Printer
 	public bool $bracesOnNextLine = true;
 	public bool $singleParameterOnOneLine = false;
 	public bool $omitEmptyNamespaces = true;
+	public bool $declareOnOpenTag = false;
 	protected ?PhpNamespace $namespace = null;
-	protected ?Dumper $dumper;
+	protected Dumper $dumper;
 	private bool $resolveTypes = true;
 
 
@@ -145,7 +145,7 @@ class Printer
 		$this->namespace = $this->resolveTypes ? $namespace : null;
 		$class->validate();
 		$resolver = $this->namespace
-			? [$namespace, 'simplifyType']
+			? $this->namespace->simplifyType(...)
 			: fn($s) => $s;
 
 		$traits = [];
@@ -178,23 +178,16 @@ class Printer
 		$readOnlyClass = $class instanceof ClassType && $class->isReadOnly();
 		$consts = [];
 		$methods = [];
-		if (
-			$class instanceof ClassType
-			|| $class instanceof InterfaceType
-			|| $class instanceof TraitType
-			|| $class instanceof EnumType
-		) {
-			foreach ($class->getConstants() as $const) {
-				$consts[] = $this->printConstant($const);
-			}
+		foreach ($class->getConstants() as $const) {
+			$consts[] = $this->printConstant($const);
+		}
 
-			foreach ($class->getMethods() as $method) {
-				if ($readOnlyClass && $method->getName() === Method::Constructor) {
-					$method = clone $method;
-					array_map(fn($param) => $param instanceof PromotedParameter ? $param->setReadOnly(false) : null, $method->getParameters());
-				}
-				$methods[] = $this->printMethod($method, $namespace, $class->isInterface());
+		foreach ($class->getMethods() as $method) {
+			if ($readOnlyClass && $method->getName() === Method::Constructor) {
+				$method = clone $method;
+				array_map(fn($param) => $param instanceof PromotedParameter ? $param->setReadOnly(false) : null, $method->getParameters());
 			}
+			$methods[] = $this->printMethod($method, $namespace, $class->isInterface());
 		}
 
 		$properties = [];
@@ -287,14 +280,17 @@ class Printer
 			}
 		}
 
-		return "<?php\n"
+		$strictTypes = $file->hasStrictTypes();
+		return '<?php' . ($strictTypes && $this->declareOnOpenTag ? ' declare(strict_types=1);' : '')
+			. "\n"
 			. ($file->getComment() ? "\n" . $this->printDocComment($file) : '')
 			. "\n"
-			. ($file->hasStrictTypes() ? "declare(strict_types=1);\n\n" : '')
+			. ($strictTypes && !$this->declareOnOpenTag ? "declare(strict_types=1);\n\n" : '')
 			. implode("\n\n", $namespaces);
 	}
 
 
+	/** @param  PhpNamespace::Name*  $of */
 	protected function printUses(PhpNamespace $namespace, string $of = PhpNamespace::NameNormal): string
 	{
 		$prefix = [
@@ -344,7 +340,10 @@ class Printer
 				$this->printDocComment($param)
 				. ($attrs ? ($multiline ? substr($attrs, 0, -1) . "\n" : $attrs) : '')
 				. ($param instanceof PromotedParameter
-					? $this->printPropertyVisibility($param) . ($param->isReadOnly() && $param->getType() ? ' readonly' : '') . ' '
+					? ($param->isFinal() ? 'final ' : '')
+						. $this->printPropertyVisibility($param)
+						. ($param->isReadOnly() && $param->getType() ? ' readonly' : '')
+						. ' '
 					: '')
 				. ltrim($this->printType($param->getType(), $param->isNullable()) . ' ')
 				. ($param->isReference() ? '&' : '')
@@ -428,6 +427,7 @@ class Printer
 	}
 
 
+	/** @param  PhpFile|ClassLike|GlobalFunction|Method|Property|Constant|Parameter|EnumCase|TraitUse|PropertyHook  $commentable */
 	protected function printDocComment(/*Traits\CommentAware*/ $commentable): string
 	{
 		$multiLine = $commentable instanceof GlobalFunction
@@ -446,7 +446,7 @@ class Printer
 	}
 
 
-	/** @param  Attribute[]  $attrs */
+	/** @param  list<Attribute>  $attrs */
 	protected function printAttributes(array $attrs, bool $inline = false): string
 	{
 		if (!$attrs) {
@@ -476,7 +476,7 @@ class Printer
 		}
 
 		$simple = true;
-		foreach ($property->getHooks() as $type => $hook) {
+		foreach ($hooks as $type => $hook) {
 			$simple = $simple && ($hook->isAbstract() || $isInterface);
 			$hooks[$type] = $this->printDocComment($hook)
 				. $this->printAttributes($hook->getAttributes())

@@ -1,16 +1,15 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Nette Framework (https://nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Nette\Caching\Storages;
 
 use Nette;
 use Nette\Caching\Cache;
+use function array_combine, array_map, extension_loaded, time, urlencode;
 
 
 /**
@@ -24,9 +23,7 @@ class MemcachedStorage implements Nette\Caching\Storage, Nette\Caching\BulkReade
 		MetaData = 'data',
 		MetaDelta = 'delta';
 
-	private \Memcached $memcached;
-	private string $prefix;
-	private ?Journal $journal;
+	private readonly \Memcached $memcached;
 
 
 	/**
@@ -41,15 +38,12 @@ class MemcachedStorage implements Nette\Caching\Storage, Nette\Caching\BulkReade
 	public function __construct(
 		string $host = 'localhost',
 		int $port = 11211,
-		string $prefix = '',
-		?Journal $journal = null,
+		private readonly string $prefix = '',
+		private readonly ?Journal $journal = null,
 	) {
 		if (!static::isAvailable()) {
 			throw new Nette\NotSupportedException("PHP extension 'memcached' is not loaded.");
 		}
-
-		$this->prefix = $prefix;
-		$this->journal = $journal;
 		$this->memcached = new \Memcached;
 		if ($host) {
 			$this->addServer($host, $port);
@@ -61,7 +55,7 @@ class MemcachedStorage implements Nette\Caching\Storage, Nette\Caching\BulkReade
 	{
 		if (@$this->memcached->addServer($host, $port, 1) === false) { // @ is escalated to exception
 			$error = error_get_last();
-			throw new Nette\InvalidStateException("Memcached::addServer(): $error[message].");
+			throw new Nette\InvalidStateException('Memcached::addServer(): ' . ($error['message'] ?? 'unknown error') . '.');
 		}
 	}
 
@@ -105,7 +99,7 @@ class MemcachedStorage implements Nette\Caching\Storage, Nette\Caching\BulkReade
 	{
 		$prefixedKeys = array_map(fn($key) => urlencode($this->prefix . $key), $keys);
 		$keys = array_combine($prefixedKeys, $keys);
-		$metas = $this->memcached->getMulti($prefixedKeys);
+		$metas = $this->memcached->getMulti($prefixedKeys) ?: [];
 		$result = [];
 		$deleteKeys = [];
 		foreach ($metas as $prefixedKey => $meta) {
@@ -133,7 +127,7 @@ class MemcachedStorage implements Nette\Caching\Storage, Nette\Caching\BulkReade
 	}
 
 
-	public function write(string $key, $data, array $dp): void
+	public function write(string $key, mixed $data, array $dp): void
 	{
 		if (isset($dp[Cache::Items])) {
 			throw new Nette\NotSupportedException('Dependent items are not supported by MemcachedStorage.');
@@ -222,7 +216,7 @@ class MemcachedStorage implements Nette\Caching\Storage, Nette\Caching\BulkReade
 			$this->memcached->flush();
 
 		} elseif ($this->journal) {
-			foreach ($this->journal->clean($conditions) as $entry) {
+			foreach ($this->journal->clean($conditions) ?? [] as $entry) {
 				$this->memcached->delete($entry, 0);
 			}
 		}

@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Compiler\Nodes\Php\Scalar;
 
@@ -14,8 +12,12 @@ use Latte\Compiler\Nodes\Php\ScalarNode;
 use Latte\Compiler\PhpHelpers;
 use Latte\Compiler\Position;
 use Latte\Compiler\PrintContext;
+use const PHP_INT_MAX;
 
 
+/**
+ * Integer literal in decimal, hex, octal, or binary notation.
+ */
 class IntegerNode extends ScalarNode
 {
 	public const KindBinary = 2;
@@ -32,7 +34,7 @@ class IntegerNode extends ScalarNode
 	}
 
 
-	public static function parse(string $str, Position $position): static
+	public static function parse(string $str, ?Position $position): static
 	{
 		$num = PhpHelpers::decodeNumber($str, $base);
 		if ($num === null) {
@@ -44,9 +46,9 @@ class IntegerNode extends ScalarNode
 
 	public function print(PrintContext $context): string
 	{
-		if ($this->value === -\PHP_INT_MAX - 1) {
+		if ($this->value === -PHP_INT_MAX - 1) {
 			// PHP_INT_MIN cannot be represented as a literal, because the sign is not part of the literal
-			return '(-' . \PHP_INT_MAX . '-1)';
+			return '(-' . PHP_INT_MAX . '-1)';
 
 		} elseif ($this->kind === self::KindDecimal) {
 			return (string) $this->value;

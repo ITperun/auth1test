@@ -1,16 +1,15 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Nette Framework (https://nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Nette\PhpGenerator\Traits;
 
 use Nette;
 use Nette\PhpGenerator\Method;
+use function strtolower;
 
 
 /**
@@ -24,7 +23,7 @@ trait MethodsAware
 
 	/**
 	 * Replaces all methods.
-	 * @param  Method[]  $methods
+	 * @param list<Method>  $methods
 	 */
 	public function setMethods(array $methods): static
 	{
@@ -38,7 +37,7 @@ trait MethodsAware
 	}
 
 
-	/** @return Method[] */
+	/** @return array<string, Method> */
 	public function getMethods(): array
 	{
 		$res = [];

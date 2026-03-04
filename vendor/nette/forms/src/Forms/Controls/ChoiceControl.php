@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Nette\Forms\Controls;
 
 use Nette;
+use function array_combine, array_fill_keys, array_key_exists, array_keys, array_map, implode, is_array, key, var_export;
 
 
 /**
@@ -68,7 +69,8 @@ abstract class ChoiceControl extends BaseControl
 	 */
 	public function getValue(): mixed
 	{
-		return array_key_exists($this->value, $this->items)
+		return $this->value !== null
+			&& array_key_exists($this->value, $this->items)
 			&& !isset($this->disabled[$this->value])
 			? $this->value
 			: null;

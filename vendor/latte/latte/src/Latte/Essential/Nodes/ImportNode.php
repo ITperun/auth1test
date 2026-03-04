@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Essential\Nodes;
 
@@ -17,7 +15,8 @@ use Latte\Compiler\Tag;
 
 
 /**
- * {import "file"[, args]}
+ * {import 'file.latte'}
+ * Imports block definitions from another template.
  */
 class ImportNode extends StatementNode
 {
@@ -39,8 +38,8 @@ class ImportNode extends StatementNode
 	public function print(PrintContext $context): string
 	{
 		return $context->format(
-			'$this->createTemplate(%node, %node? + $this->params, "import")->render() %line;',
-			$this->file,
+			'$this->createTemplate(%raw, %node? + $this->params, "import")->render() %line;',
+			$context->ensureString($this->file, 'Template name'),
 			$this->args,
 			$this->position,
 		);

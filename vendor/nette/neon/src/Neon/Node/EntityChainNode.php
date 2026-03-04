@@ -11,6 +11,7 @@ namespace Nette\Neon\Node;
 
 use Nette\Neon;
 use Nette\Neon\Node;
+use function array_map, implode;
 
 
 /** @internal */
@@ -45,5 +46,6 @@ final class EntityChainNode extends Node
 		foreach ($this->chain as &$item) {
 			yield $item;
 		}
+		$this->chain = array_values(array_filter($this->chain));
 	}
 }

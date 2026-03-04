@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace Tester;
 
+use function addcslashes, array_reverse, array_slice, array_splice, dechex, dirname, explode, file, file_put_contents, get_resource_type, implode, is_array, is_bool, is_float, is_int, is_object, is_resource, is_string, ltrim, max, md5, method_exists, min, mkdir, ord, pathinfo, preg_match, preg_replace, preg_replace_callback, spl_object_hash, str_contains, str_pad, str_repeat, str_replace, strlen, strpos, strrpos, strtoupper, strtr, substr, substr_count, substr_replace, trim, uniqid, var_export;
+use const DIRECTORY_SEPARATOR, PATHINFO_FILENAME, STR_PAD_LEFT;
+
 
 /**
  * Dumps PHP variables.
@@ -20,7 +23,7 @@ class Dumper
 	public static int $maxDepth = 10;
 	public static string $dumpDir = 'output';
 	public static int $maxPathSegments = 3;
-	public static $pathSeparator;
+	public static ?string $pathSeparator = null;
 
 
 	/**
@@ -116,6 +119,7 @@ class Dumper
 	}
 
 
+	/** @param mixed[]  $list */
 	private static function _toPhp(mixed &$var, array &$list = [], int $level = 0, int &$line = 1): string
 	{
 		if (is_float($var)) {
@@ -177,6 +181,9 @@ class Dumper
 			$rc = new \ReflectionFunction($var);
 			return "/* Closure defined in file {$rc->getFileName()} on line {$rc->getStartLine()} */";
 
+		} elseif ($var instanceof \UnitEnum) {
+			return $var::class . '::' . $var->name;
+
 		} elseif (is_object($var)) {
 			if (($rc = new \ReflectionObject($var))->isAnonymous()) {
 				return "/* Anonymous class defined in file {$rc->getFileName()} on line {$rc->getStartLine()} */";
@@ -237,14 +244,14 @@ class Dumper
 		];
 		$utf8 = preg_match('##u', $s);
 		$escaped = preg_replace_callback(
-			$utf8 ? '#[\p{C}\\\\]#u' : '#[\x00-\x1F\x7F-\xFF\\\\]#',
+			$utf8 ? '#[\p{C}\\\]#u' : '#[\x00-\x1F\x7F-\xFF\\\]#',
 			fn($m) => $special[$m[0]] ?? (strlen($m[0]) === 1
 				? '\x' . str_pad(strtoupper(dechex(ord($m[0]))), 2, '0', STR_PAD_LEFT) . ''
 				: '\u{' . strtoupper(ltrim(dechex(self::utf8Ord($m[0])), '0')) . '}'),
 			$s,
 		);
 		return $s === str_replace('\\\\', '\\', $escaped)
-			? "'" . preg_replace('#\'|\\\\(?=[\'\\\\]|$)#D', '\\\\$0', $s) . "'"
+			? "'" . preg_replace('#\'|\\\(?=[\'\\\]|$)#D', '\\\$0', $s) . "'"
 			: '"' . addcslashes($escaped, '"$') . '"';
 	}
 
@@ -255,17 +262,17 @@ class Dumper
 			"\r" => "\\r\r",
 			"\n" => "\\n\n",
 			"\t" => "\\t\t",
-			"\e" => '\\e',
+			"\e" => '\e',
 			"'" => "'",
 		];
 		$utf8 = preg_match('##u', $s);
 		$escaped = preg_replace_callback(
 			$utf8 ? '#[\p{C}\']#u' : '#[\x00-\x1F\x7F-\xFF\']#',
-			fn($m) => "\e[22m"
+			fn($m) => Ansi::boldOff()
 			. ($special[$m[0]] ?? (strlen($m[0]) === 1
 				? '\x' . str_pad(strtoupper(dechex(ord($m[0]))), 2, '0', STR_PAD_LEFT)
 				: '\u{' . strtoupper(ltrim(dechex(self::utf8Ord($m[0])), '0')) . '}'))
-			. "\e[1m",
+			. Ansi::boldOn(),
 			$s,
 		);
 		return "'" . $escaped . "'";
@@ -340,19 +347,19 @@ class Dumper
 			}
 
 			$message = strtr($message, [
-				'%1' => self::color('yellow') . self::toLine($actual) . self::color('white'),
-				'%2' => self::color('yellow') . self::toLine($expected) . self::color('white'),
+				'%1' => Ansi::color('yellow') . self::toLine($actual) . Ansi::color('white'),
+				'%2' => Ansi::color('yellow') . self::toLine($expected) . Ansi::color('white'),
 			]);
 		} else {
 			$message = ($e instanceof \ErrorException ? Helpers::errorTypeToString($e->getSeverity()) : $e::class)
 				. ': ' . preg_replace('#[\x00-\x09\x0B-\x1F]+#', ' ', $e->getMessage());
 		}
 
-		$s = self::color('white', $message) . "\n\n"
+		$s = Ansi::colorize($message, 'white') . "\n\n"
 			. (isset($stored) ? 'diff ' . Helpers::escapeArg($stored[0]) . ' ' . Helpers::escapeArg($stored[1]) . "\n\n" : '');
 
 		foreach ($trace as $item) {
-			$item += ['file' => null, 'class' => null, 'type' => null, 'function' => null];
+			$item += ['file' => null, 'line' => null, 'class' => null, 'type' => null, 'function' => null];
 			if ($e instanceof AssertException && $item['file'] === __DIR__ . DIRECTORY_SEPARATOR . 'Assert.php') {
 				continue;
 			}
@@ -363,12 +370,12 @@ class Dumper
 			$s .= 'in '
 				. ($item['file']
 					? (
-						($item['file'] === $testFile ? self::color('white') : '')
+						($item['file'] === $testFile ? Ansi::color('white') : '')
 						. implode(
 							self::$pathSeparator ?? DIRECTORY_SEPARATOR,
 							array_slice(explode(DIRECTORY_SEPARATOR, $item['file']), -self::$maxPathSegments),
 						)
-						. "($item[line])" . self::color('gray') . ' '
+						. "($item[line])" . Ansi::color('gray') . ' '
 					)
 					: '[internal function]'
 				)
@@ -376,7 +383,7 @@ class Dumper
 					? trim($line)
 					: $item['class'] . $item['type'] . $item['function'] . ($item['function'] ? '()' : '')
 				)
-				. self::color() . "\n";
+				. Ansi::reset() . "\n";
 		}
 
 		if ($e->getPrevious()) {
@@ -403,27 +410,18 @@ class Dumper
 	}
 
 
-	/**
-	 * Applies color to string.
-	 */
+	/** @deprecated use Ansi::color() or Ansi::colorize() */
 	public static function color(string $color = '', ?string $s = null): string
 	{
-		$colors = [
-			'black' => '0;30', 'gray' => '1;30', 'silver' => '0;37', 'white' => '1;37',
-			'navy' => '0;34', 'blue' => '1;34', 'green' => '0;32', 'lime' => '1;32',
-			'teal' => '0;36', 'aqua' => '1;36', 'maroon' => '0;31', 'red' => '1;31',
-			'purple' => '0;35', 'fuchsia' => '1;35', 'olive' => '0;33', 'yellow' => '1;33',
-			null => '0',
-		];
-		$c = explode('/', $color);
-		return "\e["
-			. str_replace(';', "m\e[", $colors[$c[0]] . (empty($c[1]) ? '' : ';4' . substr($colors[$c[1]], -1)))
-			. 'm' . $s . ($s === null ? '' : "\e[0m");
+		return $s === null
+			? Ansi::color($color)
+			: Ansi::colorize($s, $color);
 	}
 
 
+	/** @deprecated use Ansi::stripAnsi() */
 	public static function removeColors(string $s): string
 	{
-		return preg_replace('#\e\[[\d;]+m#', '', $s);
+		return Ansi::stripAnsi($s);
 	}
 }

@@ -11,15 +11,15 @@ namespace Nette\Bridges\ApplicationLatte;
 
 use Latte;
 use Nette;
+use function version_compare;
 
 
 /**
- * Latte powered template.
+ * Parameters of Latte templates.
  */
-class Template implements Nette\Application\UI\Template
+abstract class Template implements Nette\Application\UI\Template
 {
 	private ?string $file = null;
-	private ?string $blueprint;
 
 
 	public function __construct(
@@ -40,10 +40,7 @@ class Template implements Nette\Application\UI\Template
 	public function render(?string $file = null, array $params = []): void
 	{
 		Nette\Utils\Arrays::toObject($params, $this);
-		if (isset($this->blueprint)) {
-			Nodes\TemplatePrintNode::printClass($this->getParameters(), $this->blueprint);
-		}
-		$this->latte->render($file ?: $this->file, $this);
+		$this->latte->render($file ?? $this->file, $this);
 	}
 
 
@@ -53,7 +50,7 @@ class Template implements Nette\Application\UI\Template
 	public function renderToString(?string $file = null, array $params = []): string
 	{
 		Nette\Utils\Arrays::toObject($params, $this);
-		return $this->latte->renderToString($file ?: $this->file, $this);
+		return $this->latte->renderToString($file ?? $this->file, $this);
 	}
 
 
@@ -143,16 +140,10 @@ class Template implements Nette\Application\UI\Template
 	}
 
 
-	public function blueprint(?string $parentClass = null): void
-	{
-		$this->blueprint = $parentClass ?? self::class;
-	}
-
-
 	/**
 	 * Prevents unserialization.
 	 */
-	final public function __wakeup()
+	final public function __unserialize($_)
 	{
 		throw new Nette\NotImplementedException('Object unserialization is not supported by class ' . static::class);
 	}

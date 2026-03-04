@@ -12,6 +12,7 @@ namespace Nette\Forms\Controls;
 use Nette;
 use Nette\Utils\Html;
 use Stringable;
+use function array_merge, func_num_args, in_array, is_array, key;
 
 
 /**
@@ -44,6 +45,9 @@ class RadioList extends ChoiceControl
 	{
 		$input = parent::getControl();
 		$items = $this->getItems();
+		if (!$items) {
+			return Html::el();
+		}
 		$ids = [];
 		if ($this->generateId) {
 			foreach ($items as $value => $label) {
@@ -58,7 +62,7 @@ class RadioList extends ChoiceControl
 					'id:' => $ids,
 					'checked?' => $this->value,
 					'disabled:' => $this->disabled,
-					'data-nette-rules:' => [key($items) => $input->attrs['data-nette-rules']],
+					'data-nette-rules:' => [array_key_first($items) => $input->attrs['data-nette-rules']],
 				]),
 				['for:' => $ids] + $this->itemLabel->attrs,
 				$this->separator,

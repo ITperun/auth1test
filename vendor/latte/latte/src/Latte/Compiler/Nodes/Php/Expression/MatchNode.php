@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Compiler\Nodes\Php\Expression;
 
@@ -13,8 +11,12 @@ use Latte\Compiler\Nodes\Php;
 use Latte\Compiler\Nodes\Php\MatchArmNode;
 use Latte\Compiler\Position;
 use Latte\Compiler\PrintContext;
+use Latte\Helpers;
 
 
+/**
+ * Match expression.
+ */
 class MatchNode extends Php\ExpressionNode
 {
 	public function __construct(
@@ -45,5 +47,6 @@ class MatchNode extends Php\ExpressionNode
 		foreach ($this->arms as &$item) {
 			yield $item;
 		}
+		Helpers::removeNulls($this->arms);
 	}
 }

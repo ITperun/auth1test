@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace Tester\CodeCoverage\Generators;
 
 use Tester\Helpers;
+use function count;
+use const DIRECTORY_SEPARATOR, FILE_SKIP_EMPTY_LINES;
 
 
 /**
@@ -23,12 +25,14 @@ class HtmlGenerator extends AbstractGenerator
 		self::LineDead => 'dead', // dead code
 	];
 	private ?string $title;
+
+	/** @var list<object{name: string, file: string, lines: array<int, int>, coverage: int|float, total: int, class: string|null}> */
 	private array $files = [];
 
 
 	/**
-	 * @param  string  $file  path to coverage.dat file
-	 * @param  array   $sources  files/directories
+	 * @param  string    $file  path to coverage.dat file
+	 * @param  string[]  $sources  files/directories
 	 */
 	public function __construct(string $file, array $sources = [], ?string $title = null)
 	{

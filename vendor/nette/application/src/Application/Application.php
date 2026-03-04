@@ -12,6 +12,7 @@ namespace Nette\Application;
 use Nette;
 use Nette\Routing\Router;
 use Nette\Utils\Arrays;
+use function count, is_string, str_starts_with, strcasecmp;
 
 
 /**
@@ -169,7 +170,7 @@ class Application
 			return null;
 		}
 
-		$args = ['exception' => $e, 'previousPresenter' => $this->presenter, 'request' => Arrays::last($this->requests) ?: null];
+		$args = ['exception' => $e, 'previousPresenter' => $this->presenter, 'request' => Arrays::last($this->requests) ?? null];
 		if ($this->presenter instanceof UI\Presenter) {
 			try {
 				$this->presenter->forward(":$errorPresenter:", $args);

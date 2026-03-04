@@ -1,13 +1,13 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Latte\Essential;
+
+use function get_debug_type, is_array, max, method_exists, sprintf;
 
 
 /**
@@ -23,6 +23,7 @@ namespace Latte\Essential;
  * @property-read mixed $nextKey
  * @property-read mixed $nextValue
  * @property-read ?self $parent
+ * @extends \CachingIterator<mixed, mixed, \Iterator<mixed, mixed>>
  * @internal
  */
 class CachingIterator extends \CachingIterator implements \Countable
@@ -34,7 +35,7 @@ class CachingIterator extends \CachingIterator implements \Countable
 	public function __construct(mixed $iterator, ?self $parent = null)
 	{
 		if (is_array($iterator) || $iterator instanceof \stdClass) {
-			$iterator = new \ArrayIterator($iterator);
+			$iterator = new \ArrayIterator((array) $iterator);
 
 		} elseif ($iterator instanceof \IteratorAggregate) {
 			do {

@@ -12,6 +12,7 @@ namespace Nette\Application;
 use Nette\Http\UrlScript;
 use Nette\Routing\Router;
 use Nette\Utils\Reflection;
+use function array_intersect_key, array_key_exists, http_build_query, is_string, is_subclass_of, parse_str, preg_match, rtrim, str_contains, str_ends_with, strcasecmp, strlen, strncmp, strtr, substr, trigger_error, urldecode;
 
 
 /**
@@ -134,9 +135,9 @@ final class LinkGenerator
 				$method = $reflection->getSignalMethod($signal);
 				if (!$method) {
 					throw new UI\InvalidLinkException("Unknown signal '$signal', missing handler {$reflection->getName()}::{$component::formatSignalMethod($signal)}()");
-				} elseif ($this->isDeprecated($refPresenter, $method)) {
-					trigger_error("Link to deprecated signal '$signal'" . ($component === $refPresenter ? '' : ' in ' . $component::class) . " from '{$refPresenter->getName()}:{$refPresenter->getAction()}'.", E_USER_DEPRECATED);
 				}
+
+				$this->validateLinkTarget($refPresenter, $method, "signal '$signal'" . ($component === $refPresenter ? '' : ' in ' . $component::class), $mode);
 
 				// convert indexed parameters to named
 				UI\ParameterConverter::toParameters($method, $args, [], $missing);
@@ -165,15 +166,17 @@ final class LinkGenerator
 			$current = $refPresenter && ($action === '*' || strcasecmp($action, $refPresenter->getAction()) === 0) && $presenterClass === $refPresenter::class;
 
 			$reflection = new UI\ComponentReflection($presenterClass);
-			if ($this->isDeprecated($refPresenter, $reflection)) {
-				trigger_error("Link to deprecated presenter '$presenter' from '{$refPresenter->getName()}:{$refPresenter->getAction()}'.", E_USER_DEPRECATED);
+			$this->validateLinkTarget($refPresenter, $reflection, "presenter '$presenter'", $mode);
+
+			foreach (array_intersect_key($reflection->getParameters(), $args) as $name => $param) {
+				if ($args[$name] === $param['def']) {
+					$args[$name] = null; // value transmit is unnecessary
+				}
 			}
 
 			// counterpart of run() & tryCall()
 			if ($method = $reflection->getActionRenderMethod($action)) {
-				if ($this->isDeprecated($refPresenter, $method)) {
-					trigger_error("Link to deprecated action '$presenter:$action' from '{$refPresenter->getName()}:{$refPresenter->getAction()}'.", E_USER_DEPRECATED);
-				}
+				$this->validateLinkTarget($refPresenter, $method, "action '$presenter:$action'", $mode);
 
 				UI\ParameterConverter::toParameters($method, $args, $path === 'this' ? $refPresenter->getParameters() : [], $missing);
 
@@ -289,9 +292,28 @@ final class LinkGenerator
 	}
 
 
-	private function isDeprecated(?UI\Presenter $presenter, \ReflectionClass|\ReflectionMethod $reflection): bool
+	private function validateLinkTarget(
+		?UI\Presenter $presenter,
+		\ReflectionClass|\ReflectionMethod $element,
+		string $message,
+		string $mode,
+	): void
 	{
-		return $presenter?->invalidLinkMode
-			&& (UI\ComponentReflection::parseAnnotation($reflection, 'deprecated') || $reflection->getAttributes(Attributes\Deprecated::class));
+		if ($mode !== 'forward' && !(new UI\AccessPolicy($element))->isLinkable()) {
+			throw new UI\InvalidLinkException("Link to forbidden $message from '{$presenter->getName()}:{$presenter->getAction()}'.");
+		} elseif ($presenter?->invalidLinkMode
+			&& (UI\ComponentReflection::parseAnnotation($element, 'deprecated') || $element->getAttributes(Attributes\Deprecated::class))
+		) {
+			trigger_error("Link to deprecated $message from '{$presenter->getName()}:{$presenter->getAction()}'.", E_USER_DEPRECATED);
+		}
+	}
+
+
+	/** @internal */
+	public static function applyBase(string $link, string $base): string
+	{
+		return str_contains($link, ':') && $link[0] !== ':'
+			? ":$base:$link"
+			: $link;
 	}
 }

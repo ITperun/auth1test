@@ -1,18 +1,20 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Latte\Compiler\Nodes\Php;
 
 use Latte\Compiler\Position;
 use Latte\Compiler\PrintContext;
+use Latte\Helpers;
 
 
+/**
+ * Union type (Type1|Type2).
+ */
 class UnionTypeNode extends ComplexTypeNode
 {
 	public function __construct(
@@ -35,5 +37,6 @@ class UnionTypeNode extends ComplexTypeNode
 		foreach ($this->types as &$item) {
 			yield $item;
 		}
+		Helpers::removeNulls($this->types);
 	}
 }

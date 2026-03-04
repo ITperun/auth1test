@@ -16,6 +16,8 @@ use Nette\Application\LinkGenerator;
 use Nette\Application\Responses;
 use Nette\Http;
 use Nette\Utils\Arrays;
+use function array_slice, count, dirname, func_get_args, func_num_args, implode, in_array, is_array, is_dir, is_file, is_string, ltrim, preg_match, preg_replace, str_starts_with, strcasecmp, strlen, strncmp, strpos, strrpos, strtr, substr, substr_count, trigger_error, ucfirst;
+use const DIRECTORY_SEPARATOR;
 
 
 /**
@@ -73,15 +75,15 @@ abstract class Presenter extends Control implements Application\IPresenter
 	/** @deprecated use Presenter::DefaultAction */
 	public const DEFAULT_ACTION = self::DefaultAction;
 
-	public int $invalidLinkMode = 0;
+	public int $invalidLinkMode = self::InvalidLinkSilent;
 
-	/** @var array<callable(self): void>  Occurs when the presenter is starting */
+	/** @var array<callable(self): void>  Occurs before starup() */
 	public array $onStartup = [];
 
-	/** @var array<callable(self): void>  Occurs when the presenter is rendering after beforeRender */
+	/** @var array<callable(self): void>  Occurs before render*() and after beforeRender() */
 	public array $onRender = [];
 
-	/** @var array<callable(self, Application\Response): void>  Occurs when the presenter is shutting down */
+	/** @var array<callable(self, Application\Response): void>  Occurs before shutdown() */
 	public array $onShutdown = [];
 
 	/** automatically call canonicalize() */
@@ -185,7 +187,7 @@ abstract class Presenter extends Control implements Application\IPresenter
 
 		try {
 			// CHECK REQUIREMENTS
-			(new AccessPolicy($this, static::getReflection()))->checkAccess();
+			(new AccessPolicy(static::getReflection()))->checkAccess($this);
 			$this->checkRequirements(static::getReflection());
 			$this->checkHttpMethod();
 
@@ -475,7 +477,10 @@ abstract class Presenter extends Control implements Application\IPresenter
 	public function sendTemplate(?Template $template = null): void
 	{
 		$template ??= $this->getTemplate();
-		if (!$template->getFile()) {
+		foreach ($this->getReflection()->getTemplateVariables($this) as $name) {
+			$template->$name ??= $this->$name;
+		}
+		if ($template->getFile() === null) {
 			$template->setFile($this->findTemplateFile());
 		}
 		$this->sendResponse(new Responses\TextResponse($template));
@@ -531,7 +536,7 @@ abstract class Presenter extends Control implements Application\IPresenter
 	 */
 	public function formatLayoutTemplateFiles(): array
 	{
-		if (preg_match('#/|\\\\#', (string) $this->layout)) {
+		if (preg_match('#/|\\\#', (string) $this->layout)) {
 			return [$this->layout];
 		}
 

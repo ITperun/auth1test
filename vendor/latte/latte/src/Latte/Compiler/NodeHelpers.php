@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Compiler;
 
@@ -13,11 +11,18 @@ use Latte\Compiler\Nodes\Php;
 use Latte\Compiler\Nodes\Php\Expression;
 use Latte\Compiler\Nodes\Php\ExpressionNode;
 use Latte\Compiler\Nodes\Php\Scalar;
+use function array_merge, constant, defined;
 
 
+/**
+ * Utility functions for working with AST nodes.
+ */
 final class NodeHelpers
 {
-	/** @return Node[] */
+	/**
+	 * @param callable(Node): bool  $filter
+	 * @return Node[]
+	 */
 	public static function find(Node $node, callable $filter): array
 	{
 		$found = [];
@@ -31,6 +36,7 @@ final class NodeHelpers
 	}
 
 
+	/** @param callable(Node): bool  $filter */
 	public static function findFirst(Node $node, callable $filter): ?Node
 	{
 		$found = null;
@@ -48,7 +54,7 @@ final class NodeHelpers
 	public static function clone(Node $node): Node
 	{
 		return (new NodeTraverser)
-			->traverse($node, enter: fn(Node $node) => clone $node);
+			->traverse($node, enter: fn(Node $node) => clone $node) ?? throw new \LogicException;
 	}
 
 
@@ -90,7 +96,11 @@ final class NodeHelpers
 				? constant($name)
 				: throw new \InvalidArgumentException("The constant '$name' is not defined.");
 
-		} elseif ($node instanceof Expression\ClassConstantFetchNode && $constants) {
+		} elseif (
+			$node instanceof Expression\ClassConstantFetchNode
+			&& $constants
+			&& $node->name instanceof Php\IdentifierNode
+		) {
 			$class = $node->class instanceof Php\NameNode
 				? $node->class->toCodeString()
 				: self::toValue($node->class, $constants);

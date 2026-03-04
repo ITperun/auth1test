@@ -11,6 +11,7 @@ namespace Nette\Forms\Controls;
 
 use Nette;
 use Stringable;
+use function array_key_exists, is_array;
 
 
 /**
@@ -108,7 +109,7 @@ class SelectBox extends ChoiceControl
 			if ($this->isRequired()) {
 				$attrs['hidden:'][$promptKey] = $attrs['disabled:'][$promptKey] = true;
 				// disabled & selected for Safari, hidden for other browsers
-				$selected = array_key_exists($this->value, $this->getItems()) ? $this->value : $promptKey;
+				$selected = $this->value !== null && array_key_exists($this->value, $this->getItems()) ? $this->value : $promptKey;
 			}
 		}
 

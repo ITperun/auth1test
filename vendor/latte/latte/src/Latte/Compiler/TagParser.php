@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Compiler;
 
@@ -16,14 +14,17 @@ use Latte\Compiler\Nodes\Php\Expression;
 use Latte\Compiler\Nodes\Php\ExpressionNode;
 use Latte\Compiler\Nodes\Php\NameNode;
 use Latte\Compiler\Nodes\Php\Scalar;
+use function count, is_int, ord, preg_match, preg_replace, preg_replace_callback, str_contains, strlen, strtolower, substr;
 
 
 /**
  * Parser for PHP-like expression language used in tags.
  * Based on works by Nikita Popov, Moriyoshi Koizumi and Masato Bito.
  */
-final class TagParser extends TagParserData
+final class TagParser
 {
+	use TagParserData;
+
 	private const
 		SchemaExpression = 'e',
 		SchemaArguments = 'a',
@@ -32,17 +33,18 @@ final class TagParser extends TagParserData
 
 	private const SymbolNone = -1;
 
-	public TokenStream /*readonly*/ $stream;
+	public readonly TokenStream $stream;
 	public string $text;
 
-	/** @var \SplObjectStorage<Expression\ArrayNode> */
+	/** @var \SplObjectStorage<Expression\ArrayNode, null> */
 	protected \SplObjectStorage $shortArrays;
-	private int /*readonly*/ $offsetDelta;
+	private readonly int $offsetDelta;
 
 
+	/** @param array<int, mixed>  $tokens */
 	public function __construct(array $tokens)
 	{
-		$this->offsetDelta = $tokens[0]->position->offset ?? 0;
+		$this->offsetDelta = $tokens[0]->position->offset;
 		$tokens = $this->filterTokens($tokens);
 		$this->stream = new TokenStream(new \ArrayIterator($tokens));
 	}
@@ -107,7 +109,7 @@ final class TagParser extends TagParserData
 	{
 		$kind = [
 			Token::Php_Identifier, Token::Php_Constant, Token::Php_Ellipsis, Token::Php_Array, Token::Php_Integer,
-			Token::Php_NameFullyQualified, Token::Php_NameQualified, Token::Php_Null, Token::Php_False,
+			Token::Php_NameFullyQualified, Token::Php_NameQualified, Token::Php_Null, Token::Php_False, Token::Php_FilterPipe,
 			'(', ')', '<', '>', '[', ']', '|', '&', '{', '}', ':', ',', '=', '?',
 		];
 		$res = null;
@@ -121,6 +123,7 @@ final class TagParser extends TagParserData
 
 	/**
 	 * Parses variables used in foreach.
+	 * @return array{?Nodes\Php\ExpressionNode, Nodes\Php\ExpressionNode|Nodes\Php\ListNode, bool}
 	 * @internal
 	 */
 	public function parseForeach(): array
@@ -142,9 +145,10 @@ final class TagParser extends TagParserData
 	}
 
 
-	/** @deprecated use tryConsumeTokenBeforeUnquotedString() */
+	#[\Deprecated('use tryConsumeTokenBeforeUnquotedString()')]
 	public function tryConsumeModifier(string ...$kind): ?Token
 	{
+		trigger_error(__METHOD__ . '() was renamed to tryConsumeTokenBeforeUnquotedString()', E_USER_DEPRECATED);
 		return $this->tryConsumeTokenBeforeUnquotedString(...$kind);
 	}
 
@@ -287,15 +291,13 @@ final class TagParser extends TagParserData
 	}
 
 
-	public function throwReservedKeywordException(Token $token)
+	public function throwReservedKeywordException(Token $token): never
 	{
 		throw new Latte\CompileException("Keyword '$token->text' cannot be used in Latte.", $token->position);
 	}
 
 
-	protected function checkFunctionName(
-		Expression\FunctionCallNode|Expression\FunctionCallableNode $func,
-	): ExpressionNode
+	private function checkFunctionName(Expression\FunctionCallNode $func): Expression\FunctionCallNode
 	{
 		if ($func->name instanceof NameNode && $func->name->isKeyword()) {
 			$this->throwReservedKeywordException(new Token(0, (string) $func->name, $func->name->position));
@@ -304,7 +306,7 @@ final class TagParser extends TagParserData
 	}
 
 
-	protected static function handleBuiltinTypes(NameNode $name): NameNode|Node\IdentifierNode
+	private static function handleBuiltinTypes(NameNode $name): NameNode|Node\IdentifierNode
 	{
 		$builtinTypes = [
 			'bool' => true, 'int' => true, 'float' => true, 'string' => true, 'iterable' => true, 'void' => true,
@@ -318,7 +320,7 @@ final class TagParser extends TagParserData
 	}
 
 
-	protected static function parseOffset(string $str, Position $position): Scalar\StringNode|Scalar\IntegerNode
+	private static function parseOffset(string $str, Position $position): Scalar\StringNode|Scalar\IntegerNode
 	{
 		if (!preg_match('/^(?:0|-?[1-9][0-9]*)$/', $str)) {
 			return new Scalar\StringNode($str, $position);
@@ -333,8 +335,8 @@ final class TagParser extends TagParserData
 	}
 
 
-	/** @param ExpressionNode[] $parts */
-	protected function parseDocString(
+	/** @param ExpressionNode[]  $parts */
+	private function parseDocString(
 		string $startToken,
 		array $parts,
 		string $endToken,
@@ -359,7 +361,7 @@ final class TagParser extends TagParserData
 		$newParts = [];
 		foreach ($parts as $i => $part) {
 			if ($part instanceof Node\InterpolatedStringPartNode) {
-				$isLast = $i === \count($parts) - 1;
+				$isLast = $i === count($parts) - 1;
 				$part->value = $this->stripIndentation(
 					$part->value,
 					$indentation,
@@ -404,7 +406,7 @@ final class TagParser extends TagParserData
 		return preg_replace_callback(
 			$regex,
 			function ($matches) use ($indentation, $position) {
-				$indentLen = \strlen($indentation);
+				$indentLen = strlen($indentation);
 				$prefix = substr($matches[1], 0, $indentLen);
 				if (str_contains($prefix, $indentation[0] === ' ' ? "\t" : ' ')) {
 					throw new CompileException('Invalid indentation - tabs and spaces cannot be mixed', $position);
@@ -424,7 +426,7 @@ final class TagParser extends TagParserData
 
 	public function convertArrayToList(Expression\ArrayNode $array): Node\ListNode
 	{
-		$this->shortArrays->detach($array);
+		unset($this->shortArrays[$array]);
 		$items = [];
 		foreach ($array->items as $item) {
 			$value = $item->value;
@@ -433,7 +435,7 @@ final class TagParser extends TagParserData
 			}
 			$value = match (true) {
 				$value instanceof Expression\TemporaryNode => $value->value,
-				$value instanceof Expression\ArrayNode && $this->shortArrays->contains($value) => $this->convertArrayToList($value),
+				$value instanceof Expression\ArrayNode && isset($this->shortArrays[$value]) => $this->convertArrayToList($value),
 				default => $value,
 			};
 			$items[] = $value
@@ -456,7 +458,10 @@ final class TagParser extends TagParserData
 	}
 
 
-	/** @param  Token[]  $tokens */
+	/**
+	 * @param  Token[]  $tokens
+	 * @return Token[]
+	 */
 	private function filterTokens(array $tokens): array
 	{
 		$this->text = '';

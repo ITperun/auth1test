@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Nette\Application\UI;
 
 use Nette;
+use function array_key_exists, array_slice, class_exists, func_get_arg, func_get_args, func_num_args, get_debug_type, is_array, link, method_exists, sprintf, trigger_error;
 
 
 /**
@@ -74,7 +75,7 @@ abstract class Component extends Nette\ComponentModel\Container implements Signa
 	protected function createComponent(string $name): ?Nette\ComponentModel\IComponent
 	{
 		if (method_exists($this, $method = 'createComponent' . $name)) {
-			(new AccessPolicy($this, new \ReflectionMethod($this, $method)))->checkAccess();
+			(new AccessPolicy(new \ReflectionMethod($this, $method)))->checkAccess($this);
 		}
 		$res = parent::createComponent($name);
 		if ($res && !$res instanceof SignalReceiver && !$res instanceof StatePersistent) {
@@ -109,7 +110,7 @@ abstract class Component extends Nette\ComponentModel\Container implements Signa
 		}
 
 		$rm = $rc->getMethod($method);
-		(new AccessPolicy($this, $rm))->checkAccess();
+		(new AccessPolicy($rm))->checkAccess($this);
 		$this->checkRequirements($rm);
 		try {
 			$args = ParameterConverter::toArguments($rm, $params);

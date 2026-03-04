@@ -1,13 +1,14 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Latte;
+
+use function array_filter, array_keys, array_search, array_slice, array_unique, count, is_array, is_object, is_string, levenshtein, max, min, strlen, strpos;
+use const PHP_VERSION_ID;
 
 
 /**
@@ -16,13 +17,6 @@ namespace Latte;
  */
 class Helpers
 {
-	/** @var array<string, int>  empty (void) HTML elements */
-	public static array $emptyElements = [
-		'img' => 1, 'hr' => 1, 'br' => 1, 'input' => 1, 'meta' => 1, 'area' => 1, 'embed' => 1, 'keygen' => 1, 'source' => 1, 'base' => 1,
-		'col' => 1, 'link' => 1, 'param' => 1, 'basefont' => 1, 'frame' => 1, 'isindex' => 1, 'wbr' => 1, 'command' => 1, 'track' => 1,
-	];
-
-
 	/**
 	 * Finds the best suggestion.
 	 * @param  string[]  $items
@@ -43,7 +37,7 @@ class Helpers
 
 
 	/** intentionally without callable typehint, because it generates bad error messages */
-	public static function toReflection($callable): \ReflectionFunctionAbstract
+	public static function toReflection(mixed $callable): \ReflectionFunctionAbstract
 	{
 		if (is_string($callable) && strpos($callable, '::')) {
 			return PHP_VERSION_ID < 80300
@@ -59,6 +53,10 @@ class Helpers
 	}
 
 
+	/**
+	 * @param  array<string, mixed|\stdClass>  $list
+	 * @return array<string, mixed|\stdClass>
+	 */
 	public static function sortBeforeAfter(array $list): array
 	{
 		foreach ($list as $name => $info) {
@@ -74,7 +72,7 @@ class Helpers
 				if ($target === '*') {
 					$best = 0;
 				} elseif (isset($list[$target])) {
-					$pos = array_search($target, $names, true);
+					$pos = (int) array_search($target, $names, strict: true);
 					$best = min($pos, $best ?? $pos);
 				}
 			}
@@ -83,16 +81,68 @@ class Helpers
 				if ($target === '*') {
 					$best = count($names);
 				} elseif (isset($list[$target])) {
-					$pos = array_search($target, $names, true);
+					$pos = (int) array_search($target, $names, strict: true);
 					$best = max($pos + 1, $best);
 				}
 			}
 
-			$list = array_slice($list, 0, $best, true)
+			$best ??= count($names);
+			$list = array_slice($list, 0, $best, preserve_keys: true)
 				+ [$name => $info]
-				+ array_slice($list, $best, null, true);
+				+ array_slice($list, $best, null, preserve_keys: true);
 		}
 
 		return $list;
+	}
+
+
+	/** @param  mixed[]  $items */
+	public static function removeNulls(array &$items): void
+	{
+		$items = array_values(array_filter($items, fn($item) => $item !== null));
+	}
+
+
+	/**
+	 * Attempts to map the compiled template to the source.
+	 * @return array{name: ?string, line: ?int, column: ?int}|null
+	 */
+	public static function mapCompiledToSource(string $compiledFile, ?int $compiledLine = null): ?array
+	{
+		if (!Runtime\Cache::isCacheFile($compiledFile)) {
+			return null;
+		}
+
+		$content = file_get_contents($compiledFile);
+		if ($content === false) {
+			return null;
+		}
+		$name = preg_match('#^/\*\* source: (\S.+) \*/#m', $content, $m) ? $m[1] : null;
+		$compiledLine && preg_match('~/\* pos (\d+)(?::(\d+))? \*/~', explode("\n", $content)[$compiledLine - 1], $pos);
+		$line = isset($pos[1]) ? (int) $pos[1] : null;
+		$column = isset($pos[2]) ? (int) $pos[2] : null;
+		return $name || $line ? compact('name', 'line', 'column') : null;
+	}
+
+
+	/**
+	 * Tries to guess the position in the template from the backtrace
+	 */
+	public static function guessTemplatePosition(): ?string
+	{
+		$trace = debug_backtrace();
+		foreach ($trace as $item) {
+			if (isset($item['file']) && ($source = self::mapCompiledToSource($item['file'], $item['line'] ?? null))) {
+				$res = [];
+				if ($source['name'] && is_file($source['name'])) {
+					$res[] = "in '" . str_replace(dirname($source['name'], 2), '...', $source['name']) . "'";
+				}
+				if ($source['line']) {
+					$res[] = 'on line ' . $source['line'] . ($source['column'] ? ' at column ' . $source['column'] : '');
+				}
+				return implode(' ', $res);
+			}
+		}
+		return null;
 	}
 }

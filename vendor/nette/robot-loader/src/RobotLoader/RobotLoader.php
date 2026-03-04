@@ -1,17 +1,17 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Nette Framework (https://nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Nette\Loaders;
 
 use Nette;
 use Nette\Utils\FileSystem;
 use SplFileInfo;
+use function array_merge, defined, extension_loaded, file_get_contents, file_put_contents, filemtime, flock, fopen, function_exists, hash, is_array, is_dir, is_file, realpath, rename, serialize, spl_autoload_register, sprintf, strlen, unlink, var_export;
+use const LOCK_EX, LOCK_SH, LOCK_UN, T_CLASS, T_COMMENT, T_DOC_COMMENT, T_ENUM, T_INTERFACE, T_NAME_QUALIFIED, T_NAMESPACE, T_STRING, T_TRAIT, T_WHITESPACE, TOKEN_PARSE;
 
 
 /**
@@ -29,21 +29,21 @@ class RobotLoader
 {
 	private const RetryLimit = 3;
 
-	/** @var string[] */
+	/** @var list<string> */
 	public array $ignoreDirs = ['.*', '*.old', '*.bak', '*.tmp', 'temp'];
 
-	/** @var string[] */
+	/** @var list<string> */
 	public array $acceptFiles = ['*.php'];
 	private bool $autoRebuild = true;
 	private bool $reportParseErrors = true;
 
-	/** @var string[] */
+	/** @var list<string> */
 	private array $scanPaths = [];
 
-	/** @var string[] */
+	/** @var list<string> */
 	private array $excludeDirs = [];
 
-	/** @var array<string, array{string, int}>  class => [file, time] */
+	/** @var array<class-string, array{string, int}>  class => [file, time] */
 	private array $classes = [];
 	private bool $cacheLoaded = false;
 	private bool $refreshed = false;
@@ -78,7 +78,7 @@ class RobotLoader
 	 */
 	public function register(bool $prepend = false): static
 	{
-		spl_autoload_register([$this, 'tryLoad'], prepend: $prepend);
+		spl_autoload_register($this->tryLoad(...), prepend: $prepend);
 		return $this;
 	}
 
@@ -95,25 +95,25 @@ class RobotLoader
 			return;
 		}
 
-		[$file, $mtime] = $this->classes[$type] ?? null;
+		[$file, $mtime] = $this->classes[$type] ?? [null, null];
 
 		if ($this->autoRebuild) {
 			if (!$this->refreshed) {
 				if (!$file || !is_file($file)) {
 					$this->refreshClasses();
-					[$file] = $this->classes[$type] ?? null;
+					[$file] = $this->classes[$type] ?? [null, null];
 					$this->needSave = true;
 
 				} elseif (filemtime($file) !== $mtime) {
 					$this->updateFile($file);
-					[$file] = $this->classes[$type] ?? null;
+					[$file] = $this->classes[$type] ?? [null, null];
 					$this->needSave = true;
 				}
 			}
 
 			if (!$file || !is_file($file)) {
 				$this->missingClasses[$type] = ++$missing;
-				$this->needSave = $this->needSave || $file || ($missing <= self::RetryLimit);
+				$this->needSave = true;
 				unset($this->classes[$type]);
 				$file = null;
 			}
@@ -130,7 +130,7 @@ class RobotLoader
 	 */
 	public function addDirectory(string ...$paths): static
 	{
-		$this->scanPaths = array_merge($this->scanPaths, $paths);
+		$this->scanPaths = array_merge($this->scanPaths, array_values($paths));
 		return $this;
 	}
 
@@ -147,13 +147,13 @@ class RobotLoader
 	 */
 	public function excludeDirectory(string ...$paths): static
 	{
-		$this->excludeDirs = array_merge($this->excludeDirs, $paths);
+		$this->excludeDirs = array_merge($this->excludeDirs, array_values($paths));
 		return $this;
 	}
 
 
 	/**
-	 * @return array<string, string>  class => filename
+	 * @return array<class-string, string>  class => filename
 	 */
 	public function getIndexedClasses(): array
 	{
@@ -283,11 +283,11 @@ class RobotLoader
 		$foundClasses = is_file($file) ? $this->scanPhp($file) : [];
 
 		foreach ($foundClasses as $class) {
-			[$prevFile, $prevMtime] = $this->classes[$class] ?? null;
+			[$prevFile, $prevMtime] = $this->classes[$class] ?? [null, null];
 
 			if (isset($prevFile) && @filemtime($prevFile) !== $prevMtime) { // @ file may not exist
 				$this->updateFile($prevFile);
-				[$prevFile] = $this->classes[$class] ?? null;
+				[$prevFile] = $this->classes[$class] ?? [null, null];
 			}
 
 			if (isset($prevFile)) {
@@ -299,14 +299,14 @@ class RobotLoader
 				));
 			}
 
-			$this->classes[$class] = [$file, filemtime($file)];
+			$this->classes[$class] = [$file, (int) filemtime($file)];
 		}
 	}
 
 
 	/**
 	 * Searches classes, interfaces and traits in PHP file.
-	 * @return string[]
+	 * @return list<class-string>
 	 */
 	private function scanPhp(string $file): array
 	{
@@ -321,7 +321,6 @@ class RobotLoader
 		} catch (\ParseError $e) {
 			if ($this->reportParseErrors) {
 				$rp = new \ReflectionProperty($e, 'file');
-				$rp->setAccessible(true);
 				$rp->setValue($e, $file);
 				throw $e;
 			}
@@ -348,9 +347,7 @@ class RobotLoader
 				case T_CLASS:
 				case T_INTERFACE:
 				case T_TRAIT:
-				case PHP_VERSION_ID < 80100
-					? T_CLASS
-					: T_ENUM:
+				case T_ENUM:
 					$expected = $token->id;
 					$name = '';
 					continue 2;
@@ -456,7 +453,7 @@ class RobotLoader
 
 	/**
 	 * Writes class list to cache.
-	 * @param  resource  $lock
+	 * @param  ?resource  $lock
 	 */
 	private function saveCache($lock = null): void
 	{
@@ -465,7 +462,7 @@ class RobotLoader
 		// on Windows: that the file is not read by another thread
 		$file = $this->generateCacheFileName();
 		$lock = $lock ?: $this->acquireLock("$file.lock", LOCK_EX);
-		$code = "<?php\nreturn " . var_export([$this->classes, $this->missingClasses, $this->emptyFiles], true) . ";\n";
+		$code = "<?php\nreturn " . var_export([$this->classes, $this->missingClasses, $this->emptyFiles], return: true) . ";\n";
 
 		if (file_put_contents("$file.tmp", $code) !== strlen($code) || !rename("$file.tmp", $file)) {
 			@unlink("$file.tmp"); // @ file may not exist
@@ -478,18 +475,21 @@ class RobotLoader
 	}
 
 
-	/** @return resource */
+	/**
+	 * @param  LOCK_SH|LOCK_EX  $mode
+	 * @return resource
+	 */
 	private function acquireLock(string $file, int $mode)
 	{
 		$handle = @fopen($file, 'w'); // @ is escalated to exception
 		if (!$handle) {
-			throw new \RuntimeException(sprintf("Unable to create file '%s'. %s", $file, error_get_last()['message']));
+			throw new \RuntimeException(sprintf("Unable to create file '%s'. %s", $file, error_get_last()['message'] ?? ''));
 		} elseif (!@flock($handle, $mode)) { // @ is escalated to exception
 			throw new \RuntimeException(sprintf(
 				"Unable to acquire %s lock on file '%s'. %s",
 				$mode & LOCK_EX ? 'exclusive' : 'shared',
 				$file,
-				error_get_last()['message'],
+				error_get_last()['message'] ?? '',
 			));
 		}
 
@@ -503,10 +503,11 @@ class RobotLoader
 			throw new \LogicException('Set path to temporary directory using setTempDirectory().');
 		}
 
-		return $this->tempDirectory . '/' . hash(PHP_VERSION_ID < 80100 ? 'md5' : 'xxh128', serialize($this->generateCacheKey())) . '.php';
+		return $this->tempDirectory . '/' . hash('xxh128', serialize($this->generateCacheKey())) . '.php';
 	}
 
 
+	/** @return array{list<string>, list<string>, list<string>, list<string>, string} */
 	protected function generateCacheKey(): array
 	{
 		return [$this->ignoreDirs, $this->acceptFiles, $this->scanPaths, $this->excludeDirs, 'v2'];

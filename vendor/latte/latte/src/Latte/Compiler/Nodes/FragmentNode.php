@@ -1,24 +1,27 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
 
-declare(strict_types=1);
-
 namespace Latte\Compiler\Nodes;
 
 use Latte\Compiler\PrintContext;
+use Latte\Helpers;
+use function array_merge, count;
 
 
+/**
+ * Container for sequence of child nodes.
+ */
 final class FragmentNode extends AreaNode
 {
 	/** @var AreaNode[] */
 	public array $children = [];
 
 
-	/** @param AreaNode[] $children */
+	/** @param AreaNode[]  $children */
 	public function __construct(array $children = [])
 	{
 		foreach ($children as $child) {
@@ -65,5 +68,6 @@ final class FragmentNode extends AreaNode
 		foreach ($this->children as &$item) {
 			yield $item;
 		}
+		Helpers::removeNulls($this->children);
 	}
 }

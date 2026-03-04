@@ -1,6 +1,4 @@
-<?php
-
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 namespace Nette\PhpGenerator;
 
@@ -20,7 +18,7 @@ final class PropertyHook
 	private bool $final = false;
 	private bool $abstract = false;
 
-	/** @var Parameter[] */
+	/** @var array<string, Parameter> */
 	private array $parameters = [];
 	private bool $returnReference = false;
 
@@ -79,7 +77,10 @@ final class PropertyHook
 	}
 
 
-	/** @internal */
+	/**
+	 * @param  list<Parameter>  $val
+	 * @internal
+	 */
 	public function setParameters(array $val): static
 	{
 		(function (Parameter ...$val) {})(...$val);
@@ -92,7 +93,10 @@ final class PropertyHook
 	}
 
 
-	/** @internal */
+	/**
+	 * @return  array<string, Parameter>
+	 * @internal
+	 */
 	public function getParameters(): array
 	{
 		return $this->parameters;

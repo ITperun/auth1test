@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Tester\CodeCoverage;
 use pcov;
+use function defined, in_array;
+use const LOCK_EX, LOCK_UN, XDEBUG_CC_DEAD_CODE, XDEBUG_CC_UNUSED;
 
 
 /**
@@ -26,6 +28,7 @@ class Collector
 	private static string $engine;
 
 
+	/** @return array<array{string, string}>  [engine name, version] */
 	public static function detectEngines(): array
 	{
 		return array_filter([
@@ -54,12 +57,12 @@ class Collector
 		} elseif (!in_array(
 			$engine,
 			array_map(fn(array $engineInfo) => $engineInfo[0], self::detectEngines()),
-			true,
+			strict: true,
 		)) {
 			throw new \LogicException("Code coverage engine '$engine' is not supported.");
 		}
 
-		self::$file = fopen($file, 'c+');
+		self::$file = fopen($file, 'c+') ?: throw new \RuntimeException("Cannot open file '$file' for code coverage.");
 		self::$engine = $engine;
 		self::{'start' . $engine}();
 
@@ -113,6 +116,7 @@ class Collector
 
 	/**
 	 * Collects information about code coverage.
+	 * @return array{array<string, array<int, int>>, array<string, array<int, int>>}  [positive, negative]
 	 */
 	private static function collectPCOV(): array
 	{
@@ -146,6 +150,7 @@ class Collector
 
 	/**
 	 * Collects information about code coverage.
+	 * @return array{array<string, array<int, int>>, array<string, array<int, int>>}  [positive, negative]
 	 */
 	private static function collectXdebug(): array
 	{
@@ -177,6 +182,7 @@ class Collector
 
 	/**
 	 * Collects information about code coverage.
+	 * @return array{array<string, array<int, int>>, array<string, array<int, int>>}  [positive, negative]
 	 */
 	private static function collectPhpDbg(): array
 	{

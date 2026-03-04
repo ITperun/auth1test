@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Compiler\Nodes\Php\Expression;
 
@@ -13,8 +11,12 @@ use Latte\CompileException;
 use Latte\Compiler\Nodes\Php\ExpressionNode;
 use Latte\Compiler\Position;
 use Latte\Compiler\PrintContext;
+use Latte\Helpers;
 
 
+/**
+ * isset() language construct.
+ */
 class IssetNode extends ExpressionNode
 {
 	public function __construct(
@@ -50,5 +52,6 @@ class IssetNode extends ExpressionNode
 		foreach ($this->vars as &$item) {
 			yield $item;
 		}
+		Helpers::removeNulls($this->vars);
 	}
 }

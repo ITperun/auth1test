@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace Tester;
 
+use function array_slice, count, defined;
+use const DIRECTORY_SEPARATOR, PREG_SET_ORDER;
+
 
 /**
  * Test helpers.
@@ -16,11 +19,26 @@ namespace Tester;
 class Helpers
 {
 	/**
+	 * Reads entire file into a string.
+	 * @throws \Exception
+	 */
+	public static function readFile(string $file): string
+	{
+		$content = @file_get_contents($file); // @ is escalated to exception
+		if ($content === false) {
+			throw new \Exception("Unable to read file '$file'.");
+		}
+
+		return $content;
+	}
+
+
+	/**
 	 * Purges directory.
 	 */
 	public static function purge(string $dir): void
 	{
-		if (preg_match('#^(\w:)?[/\\\\]?$#', $dir)) {
+		if (preg_match('#^(\w:)?[/\\\]?$#', $dir)) {
 			throw new \InvalidArgumentException('Directory must not be an empty string or root path.');
 		}
 
@@ -40,6 +58,7 @@ class Helpers
 
 	/**
 	 * Find common directory for given paths. All files or directories must exist.
+	 * @param  string[]  $paths
 	 * @return string  Empty when not found. Slash and back slash chars normalized to DIRECTORY_SEPARATOR.
 	 * @internal
 	 */
@@ -72,6 +91,7 @@ class Helpers
 
 	/**
 	 * Parse the first docblock encountered in the provided string.
+	 * @return mixed[]  annotation name => value(s)
 	 * @internal
 	 */
 	public static function parseDocComment(string $s): array
@@ -105,9 +125,9 @@ class Helpers
 	 */
 	public static function errorTypeToString(int $type): string
 	{
-		$consts = get_defined_constants(true);
+		$consts = get_defined_constants(categorize: true);
 		foreach ($consts['Core'] as $name => $val) {
-			if ($type === $val && substr($name, 0, 2) === 'E_') {
+			if ($type === $val && str_starts_with($name, 'E_')) {
 				return $name;
 			}
 		}

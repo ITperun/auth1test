@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Nette\Neon;
 
+use function array_key_exists, count, end, is_scalar, min, strlen, strncmp, substr, substr_count;
+
 
 /** @internal */
 final class Parser
@@ -16,7 +18,7 @@ final class Parser
 	private TokenStream $tokens;
 
 	/** @var int[] */
-	private $posToLine = [];
+	private array $posToLine = [];
 
 
 	public function parse(TokenStream $tokens): Node

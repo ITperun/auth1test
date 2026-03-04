@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace Tester;
 
+use function is_array;
+use const DIRECTORY_SEPARATOR, INI_SCANNER_TYPED, PATHINFO_EXTENSION, PREG_SET_ORDER;
+
 
 /**
  * Utility class for providing data from various sources for tests.
@@ -18,6 +21,7 @@ class DataProvider
 {
 	/**
 	 * Loads data from a specified file and filters them based on a query string. Supports both PHP files and INI files.
+	 * @return array<string, mixed>
 	 */
 	public static function load(string $file, string $query = ''): array
 	{
@@ -92,6 +96,7 @@ class DataProvider
 
 	/**
 	 * Parses a data provider annotation from a test method to extract the file path and query.
+	 * @return array{string, string, bool}  [file path, query, optional]
 	 */
 	public static function parseAnnotation(string $annotation, string $file): array
 	{

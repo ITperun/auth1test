@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Nette\Bridges\ApplicationDI;
 
 use Nette;
+use function array_filter, array_values, class_exists, count, implode, touch;
 
 
 /**
@@ -55,7 +56,7 @@ final class PresenterFactoryCallback
 			throw $e;
 		}
 
-		if ($presenter instanceof Nette\Application\UI\Presenter && !isset($presenter->invalidLinkMode)) {
+		if ($presenter instanceof Nette\Application\UI\Presenter && !$presenter->invalidLinkMode) {
 			$presenter->invalidLinkMode = $this->invalidLinkMode;
 		}
 

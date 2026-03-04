@@ -1,11 +1,9 @@
-<?php
+<?php declare(strict_types=1);
 
 /**
  * This file is part of the Latte (https://latte.nette.org)
  * Copyright (c) 2008 David Grudl (https://davidgrudl.com)
  */
-
-declare(strict_types=1);
 
 namespace Latte\Essential\Nodes;
 
@@ -19,10 +17,11 @@ use Latte\Compiler\Nodes\TextNode;
 use Latte\Compiler\PrintContext;
 use Latte\Compiler\Tag;
 use Latte\Compiler\TemplateParser;
+use function count, preg_match;
 
 
 /**
- * {embed [block|file] name [,] [params]}
+ * {embed 'file.latte'|#block} ... {/embed}
  */
 class EmbedNode extends StatementNode
 {
@@ -33,7 +32,7 @@ class EmbedNode extends StatementNode
 	public int|string|null $layer;
 
 
-	/** @return \Generator<int, ?array, array{FragmentNode, ?Tag}, static> */
+	/** @return \Generator<int, ?list<string>, array{FragmentNode, ?Tag}, static> */
 	public static function create(Tag $tag, TemplateParser $parser): \Generator
 	{
 		if ($tag->isNAttribute()) {
@@ -82,7 +81,7 @@ class EmbedNode extends StatementNode
 				<<<'XX'
 					$this->enterBlockLayer(%dump, get_defined_vars()) %line; %raw
 					try {
-						$this->createTemplate(%node, %node, "embed")->renderToContentType(%dump) %1.line;
+						$this->createTemplate(%raw, %node, "embed")->renderToContentType(%dump) %1.line;
 					} finally {
 						$this->leaveBlockLayer();
 					}
@@ -91,7 +90,7 @@ class EmbedNode extends StatementNode
 				$this->layer,
 				$this->position,
 				$imports,
-				$this->name,
+				$context->ensureString($this->name, 'Template name'),
 				$this->args,
 				$context->getEscaper()->export(),
 			)
@@ -100,7 +99,7 @@ class EmbedNode extends StatementNode
 					$this->enterBlockLayer(%dump, get_defined_vars()) %line; %raw
 					$this->copyBlockLayer();
 					try {
-						$this->renderBlock(%node, %node, %dump) %1.line;
+						$this->renderBlock(%raw, %node, %dump) %1.line;
 					} finally {
 						$this->leaveBlockLayer();
 					}
@@ -109,7 +108,7 @@ class EmbedNode extends StatementNode
 				$this->layer,
 				$this->position,
 				$imports,
-				$this->name,
+				$context->ensureString($this->name, 'Block name'),
 				$this->args,
 				$context->getEscaper()->export(),
 			);

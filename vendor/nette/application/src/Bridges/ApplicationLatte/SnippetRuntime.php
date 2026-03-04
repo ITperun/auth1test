@@ -12,6 +12,7 @@ namespace Nette\Bridges\ApplicationLatte;
 use Nette;
 use Nette\Application\UI\Control;
 use Nette\Application\UI\Renderable;
+use function array_pop, array_shift, end, ob_end_clean, ob_get_clean, ob_start, reset, trigger_error;
 
 
 /**
@@ -55,7 +56,7 @@ final class SnippetRuntime
 			($this->nestingLevel === 0 && $this->control->isControlInvalid($name))
 			|| ($type === self::TypeDynamic && ($previous = end($this->stack)) && $previous[1] === true)
 		) {
-			ob_start(fn() => null);
+			ob_start(fn() => '');
 			$this->nestingLevel = $type === self::TypeArea ? 0 : 1;
 			$obStarted = true;
 		} elseif ($this->nestingLevel > 0) {
@@ -117,6 +118,8 @@ final class SnippetRuntime
 
 		$this->control->snippetMode = true;
 		$this->renderChildren();
+
+		$this->renderingSnippets = false;
 		return true;
 	}
 
